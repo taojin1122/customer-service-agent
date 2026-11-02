@@ -36,10 +36,10 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
+        <!-- 记忆持久化走 JPA（H2 / MySQL），代码中未使用 Redis。
+             此前残留的 spring-boot-starter-data-redis 会让 actuator 自动装配 RedisHealthIndicator，
+             本地未启动 Redis 时 /actuator/health 被判定为 DOWN（HTTP 503）。
+             将来若要用 Redis 做长期记忆，再把 starter 加回并配置 spring.data.redis.* 即可。 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

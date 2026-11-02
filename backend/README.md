@@ -16,11 +16,12 @@
 
 ## 1. 当前状态 vs 目标架构
 
-| 维度 | 当前（2026-09-20） | 目标（设计决策） |
+| 维度 | 当前（2026-11-02） | 目标（设计决策） |
 |---|---|---|
 | 形态 | 单 Spring Boot 应用（`cs-agent-server` 唯一启动类，聚合 7 模块） | 7 逻辑服务 / **3 物理进程**（见 §3 注） |
 | Java | 21（已升） | 21 |
-| Spring Boot | 3.4.7 | 3.4.7（兼容 21，暂保留） |
+| Spring Boot | 4.1.2 | 4.1.2 |
+| Spring AI | 2.0.2 | 2.0.2 |
 | 数据库 | MySQL（`application-mysql.yml`） | PostgreSQL 14+ + PGVector + RLS |
 | 向量库 | `SimpleMemoryVectorStore`（内存 demo） | PGVector |
 | Embedding | `LocalHashEmbeddingService`（本地哈希伪） | 真实 embedding API |
@@ -33,7 +34,7 @@
 
 ## 2. 技术栈
 
-- **语言/框架**：Java 21 + Spring Boot 3.4.7 + Spring Cloud Alibaba
+- **语言/框架**：Java 21 + Spring Boot 4.1.2 + Spring AI 2.0.2 + Spring Cloud Alibaba
 - **ORM**：Spring Data JPA（当前）；多租户隔离用 JPA 规范 + PostgreSQL RLS
 - **服务治理**：Nacos（注册发现 + 配置中心）、Sentinel（流控熔断）、Seata（跨服务分布式事务）
 - **边缘网关**：Apache APISIX（设计定，**不用 Spring Cloud Gateway**）；目前未部署，HTTP 入口暂由 `cs-agent-server` 的 web 层承担

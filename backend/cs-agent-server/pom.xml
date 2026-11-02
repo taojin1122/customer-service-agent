@@ -50,10 +50,8 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
-        </dependency>
+        <!-- Boot 4 已将 spring-boot-starter-aop 更名为 spring-boot-starter-aspectj；
+             本项目未使用任何 @Aspect 切面，直接移除。将来需要时改用 aspectj starter。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>

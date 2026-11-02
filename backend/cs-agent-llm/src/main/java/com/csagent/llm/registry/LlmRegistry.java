@@ -13,7 +13,6 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -62,13 +61,12 @@ public class LlmRegistry {
             log.warn("跳过无效模型配置：id={}, baseUrl={}", cfg.getId(), cfg.getBaseUrl());
             return;
         }
-        OpenAiApi api = OpenAiApi.builder()
+        // Spring AI 2.0 起底层换成官方 openai-java SDK：不再有 OpenAiApi 这个中间对象，
+        // baseUrl / apiKey 直接写在 Options 上，build() 时框架据此自动创建底层 OpenAIClient。
+        OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
+                // OpenAI 兼容端点地址（DeepSeek / 硅基流动 等）
                 .baseUrl(cfg.getBaseUrl())
                 .apiKey(cfg.getApiKey() == null ? "" : cfg.getApiKey())
-                .build();
-
-        // ChatModel（同步 + 流式一体）
-        OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
                 //  模型名，如 deepseek-chat / gpt-4o-mini
                 .model(cfg.getModel())
                 // 采样温度
@@ -77,8 +75,7 @@ public class LlmRegistry {
                 .maxTokens(cfg.getMaxTokens())
                 .build();
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .openAiApi(api)
-                .defaultOptions(chatOptions)
+                .options(chatOptions)
                 .build();
         chatModels.put(cfg.getId(), chatModel);
         streamingChatModels.put(cfg.getId(), chatModel);
@@ -89,12 +86,15 @@ public class LlmRegistry {
      * 注册 Embedding 模型（单独配置，因 DeepSeek 官方暂无 Embedding API）
      */
     public void registerEmbedding(String id, String baseUrl, String apiKey, String model) {
-        OpenAiApi api = OpenAiApi.builder()
+        OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey == null ? "" : apiKey)
+                .model(model)
                 .build();
-        OpenAiEmbeddingModel embeddingModel = new OpenAiEmbeddingModel(api, MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(model).build());
+        OpenAiEmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
+                .metadataMode(MetadataMode.EMBED)
+                .options(options)
+                .build();
         embeddingModels.put(id, embeddingModel);
         log.info("注册 Embedding 模型：id={}, model={}, baseUrl={}", id, model, baseUrl);
     }

@@ -229,8 +229,12 @@ public class AgentEngine {
                 //     必须同时把"我刚才决定调了 X（AssistantMessage）"和"工具返回了 Y（ToolResponseMessage）"
                 //     加回 messages，下一轮调 LLM 时它才"看得到"自己做了什么、拿到了什么，否则它会失忆、重复调用。
                 messages.add(new AssistantMessage(text));
-                messages.add(new ToolResponseMessage(List.of(new ToolResponseMessage.ToolResponse(
-                        "call_" + iterations, toolName, result.isSuccess() ? result.getOutput() : "错误：" + result.getError()))));
+                // 2.0 起 ToolResponseMessage 构造器改为 protected，统一走 builder 构建
+                messages.add(ToolResponseMessage.builder()
+                        .responses(List.of(new ToolResponseMessage.ToolResponse(
+                                "call_" + iterations, toolName,
+                                result.isSuccess() ? result.getOutput() : "错误：" + result.getError())))
+                        .build());
                 // 工具结果也落库，作为记忆的一部分，保证多轮对话里机器人记得自己查过什么。
                 memoryService.appendMessage(conversationId, AgentConstants.ROLE_TOOL,
                         result.isSuccess() ? result.getOutput() : result.getError(), toolName);

@@ -2,7 +2,8 @@ package com.csagent.server;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
+// Boot 4 重组了 autoconfigure 包结构，@EntityScan 从 autoconfigure.domain 迁到 persistence.autoconfigure
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 

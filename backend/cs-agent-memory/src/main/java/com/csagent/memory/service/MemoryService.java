@@ -142,8 +142,13 @@ public class MemoryService {
                 default -> {
                     // 工具结果消息，尝试还原为 ToolResponseMessage
                     try {
-                        messages.add(new ToolResponseMessage(List.of(new ToolResponseMessage.ToolResponse(
-                                "call_" + e.getId(), e.getToolCalls() == null ? e.getId() : e.getToolCalls(), e.getContent()))));
+                        // 2.0 起 ToolResponseMessage 构造器改为 protected，统一走 builder 构建
+                        messages.add(ToolResponseMessage.builder()
+                                .responses(List.of(new ToolResponseMessage.ToolResponse(
+                                        "call_" + e.getId(),
+                                        e.getToolCalls() == null ? e.getId() : e.getToolCalls(),
+                                        e.getContent())))
+                                .build());
                     } catch (Exception ex) {
                         log.warn("工具消息还原失败，跳过：{}", e.getId());
                     }

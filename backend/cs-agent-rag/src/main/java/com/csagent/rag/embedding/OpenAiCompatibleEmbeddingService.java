@@ -6,7 +6,6 @@ import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Primary;
@@ -27,6 +26,8 @@ import java.util.List;
 public class OpenAiCompatibleEmbeddingService implements EmbeddingService {
 
     private final OpenAiEmbeddingModel embeddingModel;
+    /** 复用同一份 Options，避免每次调用都重建（2.0 里 baseUrl / apiKey 也挂在 Options 上） */
+    private final OpenAiEmbeddingOptions embeddingOptions;
     private final String model;
 
     public OpenAiCompatibleEmbeddingService(
@@ -34,9 +35,17 @@ public class OpenAiCompatibleEmbeddingService implements EmbeddingService {
             @Value("${cs-agent.llm.embedding.api-key}") String apiKey,
             @Value("${cs-agent.llm.embedding.model}") String model) {
         this.model = model;
-        OpenAiApi api = OpenAiApi.builder().baseUrl(baseUrl).apiKey(apiKey).build();
-        this.embeddingModel = new OpenAiEmbeddingModel(api, MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(model).build());
+        // Spring AI 2.0 起底层换成官方 openai-java SDK：不再有 OpenAiApi 中间对象，
+        // baseUrl / apiKey 直接写在 Options 上，build() 时框架据此创建底层客户端。
+        this.embeddingOptions = OpenAiEmbeddingOptions.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .model(model)
+                .build();
+        this.embeddingModel = OpenAiEmbeddingModel.builder()
+                .metadataMode(MetadataMode.EMBED)
+                .options(embeddingOptions)
+                .build();
         log.info("启用外部 Embedding API：model={}, baseUrl={}", model, baseUrl);
     }
 

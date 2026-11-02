@@ -2,9 +2,9 @@
 
 一个从零搭建的**智能客服 Agent 项目**，用于学习和实践主流 Agent 开发知识体系。
 
-- **后端**：Java 17 + Spring Boot 3.4 + Spring AI 1.0（GA）+ DeepSeek（OpenAI 兼容协议）
+- **后端**：Java 21 + Spring Boot 4.1.2 + Spring AI 2.0.2 + DeepSeek（OpenAI 兼容协议）
 - **前端**：Vue 3 + Vite + TypeScript + Element Plus + Pinia
-- **存储**：H2（默认零依赖）/ MySQL（生产形态）；Redis Stack（可选向量库）
+- **存储**：H2（默认零依赖）/ MySQL（生产形态）；向量库为本地内存实现（demo）。Redis Stack 仅在 `docker-compose.yml` 中预置，尚未接入代码
 - **文档**：[docs/](./docs/) 目录含架构设计、Agent 知识体系、开发流程、框架对比
 
 ---
@@ -13,9 +13,9 @@
 
 ### 1. 准备
 
-1. JDK 17
+1. JDK 21（Spring AI 2.0 的硬性基线，不再是 17）
 2. Maven 3.6+
-3. Node.js 16+
+3. Node.js 20+（Vite 6 要求 ≥ 18）
 4. DeepSeek API Key（[platform.deepseek.com](https://platform.deepseek.com) 获取）
 
 ### 2. 配置 API Key
@@ -63,7 +63,7 @@ npm run dev
 ```bash
 # 激活 mysql profile（先执行 sql/init.sql 建库）
 mvn spring-boot:run -Dspring-boot.run.profiles=mysql
-# 或用 docker compose 一键起 MySQL + Redis Stack
+# 或用 docker compose 一键起 MySQL + Redis Stack（Redis 目前仅预置，应用尚未接入）
 docker compose up -d
 ```
 
@@ -207,7 +207,7 @@ public class LockerTools {
 
 | 问题 | 解决 |
 |---|---|
-| 对话报"未配置 LLM 模型" | 检查 `DEEPSEEK_API_KEY` 环境变量或 application.yml |
+| 对话报"未配置 LLM 模型" | 检查 `DEEPSEEK_API_KEY` 环境变量或 `application-secret.yml`（**不要**写进 application.yml） |
 | 工具调用不稳定 | DeepSeek 对复杂 JSON 输出偶有失误，可调低 temperature、简化工具描述 |
 | 想用其他模型 | 在 `cs-agent.llm.models` 追加配置即可（OpenAI/通义/本地 Ollama 均可） |
 | 知识库检索效果差 | demo 默认本地哈希向量，生产切换外部 Embedding API（application.yml 注释中有配置） |
@@ -218,5 +218,5 @@ public class LockerTools {
 ## 八、参考
 
 - [Spring AI 官方文档](https://docs.spring.io/spring-ai/reference/)
-- [Spring AI 1.0 GA 发布公告](https://spring.io/blog/2025/05/20/spring-ai-1-0-0-ga-released)
+- [Spring AI 2.0 GA 发布公告](https://spring.io/blog/2026/06/12/spring-ai-2-0-0-GA-available-now)
 - [DeepSeek API 文档](https://api-docs.deepseek.com/)

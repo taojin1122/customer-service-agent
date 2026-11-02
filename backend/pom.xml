@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.7</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -35,7 +35,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <!-- 2026-09-14 用户确认：Java 升 21（设计文档原定），严格按设计拆 7 微服务 -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-ai.version>1.0.1</spring-ai.version>
+        <spring-ai.version>2.0.2</spring-ai.version>
         <tika.version>2.9.2</tika.version>
     </properties>
 
