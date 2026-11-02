@@ -20,12 +20,22 @@
 
 ### 2. 配置 API Key
 
-编辑 `backend/cs-agent-server/src/main/resources/application.yml`，或直接设置环境变量：
+**方式一：环境变量（推荐，优先级最高）**
 
 ```bash
 # Windows PowerShell
 $env:DEEPSEEK_API_KEY = "sk-xxxxxxxxxxxxxxxx"
 ```
+
+**方式二：本地密钥文件（适合 IDE 直接启动，免去每次设环境变量）**
+
+1. 打开 `backend/cs-agent-server/src/main/resources/application-secret.yml`
+2. 在 `cs-agent.secrets.deepseek-api-key` 处填入 Key
+
+该文件已被 `.gitignore` 忽略，不会提交到版本库。
+
+> ⚠ **切勿把 Key 写进 `application.yml`** —— 该文件受版本控制，一旦写入明文 Key 即等同于公开泄露。
+> 密钥解析优先级：`DEEPSEEK_API_KEY` 环境变量 > `application-secret.yml`。
 
 ### 3. 启动后端
 
