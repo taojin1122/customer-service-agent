@@ -1,0 +1,35 @@
+# 智能客服 Agent 生产形态基础设施
+# 用法：docker compose up -d
+# 说明：本机如无 Docker，可跳过本文件，使用默认 H2 内存数据库 + 本地向量库即可运行 demo
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cs-agent-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: csagent123
+      MYSQL_DATABASE: cs_agent
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pcsagent123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-stack:
+    # Redis Stack：带向量检索（RediSearch）与 JSON 能力，可作 RAG 向量库
+    image: redis/redis-stack:latest
+    container_name: cs-agent-redis-stack
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mysql-data:
+  redis-data:

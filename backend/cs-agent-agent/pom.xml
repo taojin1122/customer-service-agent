@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.csagent</groupId>
+        <artifactId>cs-agent-backend</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>cs-agent-agent</artifactId>
+    <name>cs-agent-agent</name>
+    <description>Agent 核心：ReAct 循环引擎、意图识别、编排</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-llm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-prompt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-tool</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-memory</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-rag</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

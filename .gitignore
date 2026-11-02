@@ -1,15 +1,32 @@
-# Java / Maven
+# ==================== Java / Maven ====================
 backend/**/target/
+target/
 *.class
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
+# Maven 插件生成的 pom 副本
+.flattened-pom.xml
+dependency-reduced-pom.xml
+# JVM 崩溃日志
+hs_err_pid*.log
+replay_pid*.log
 
-# Node / 前端
+# ==================== Node / 前端 ====================
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# IDE
+# TypeScript 编译产物：vite.config.ts 经 tsc -b 输出，非源码
+# 注意 vite 会优先加载 vite.config.js，这两个文件遗留在源码目录会导致改 .ts 不生效
+frontend/vite.config.js
+frontend/vite.config.d.ts
+*.tsbuildinfo
+
+# ==================== IDE ====================
 .idea/
 *.iml
 .vscode/
@@ -17,12 +34,22 @@ npm-debug.log*
 .classpath
 .project
 
-# 环境与密钥
+# ==================== 环境与密钥 ====================
 .env
+.env.local
+.env.*.local
 *.local.yml
 application-secret.yml
 
-# 系统
+# ==================== 文档（本地设计稿，不纳入版本库） ====================
+docs/
+
+# ==================== 运行时产物 ====================
+logs/
+*.log
+*.pid
+coverage/
+
+# ==================== 系统 ====================
 .DS_Store
 Thumbs.db
-./docs

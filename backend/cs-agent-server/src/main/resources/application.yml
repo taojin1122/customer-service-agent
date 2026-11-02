@@ -1,0 +1,74 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: cs-agent-server
+  profiles:
+    active: dev
+    # 额外加载 application-secret.yml（该文件已被 .gitignore 忽略）用于存放本地密钥，
+    # 避免把 API Key 明文写进会随代码提交的 application.yml。文件不存在时不受影响。
+    include: secret
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
+  # 本项目通过 LlmRegistry 手动构建 OpenAI 兼容模型（DeepSeek），
+  # 排除 Spring AI 的 OpenAI 自动配置，避免要求 spring.ai.openai.api-key
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
+
+# ==================== 智能客服 Agent 配置 ====================
+cs-agent:
+  llm:
+    # 默认模型 id（对应 models 列表中的 id）
+    default-model: deepseek
+    # 多模型列表：可同时配置 DeepSeek / OpenAI / 其他 OpenAI 兼容服务
+    models:
+      - id: deepseek
+        name: DeepSeek-Chat
+        base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+        # 密钥来源优先级：环境变量 DEEPSEEK_API_KEY > application-secret.yml 中的 cs-agent.secrets.deepseek-api-key
+        # 严禁在此处填写明文 Key —— 本文件会随代码提交，一旦写入即等同公开泄露。
+        api-key: ${DEEPSEEK_API_KEY:${cs-agent.secrets.deepseek-api-key:}}
+        model: deepseek-chat
+        temperature: 0.7
+        max-tokens: 2048
+      # 示例：配置 OpenAI（需代理）
+      # - id: openai
+      #   name: OpenAI-GPT4o-mini
+      #   base-url: https://api.openai.com
+      #   api-key: ${OPENAI_API_KEY:}
+      #   model: gpt-4o-mini
+      #   temperature: 0.7
+      #   max-tokens: 2048
+    # 可选：外部 Embedding API（DeepSeek 暂无 Embedding，推荐硅基流动 SiliconFlow 的 bge-m3）
+    # 未配置时自动使用本地哈希 Embedding（demo 开箱即用）
+    embedding:
+      base-url: ${EMBEDDING_BASE_URL:}
+      api-key: ${EMBEDDING_API_KEY:}
+      model: BAAI/bge-m3
+  rag:
+    # 分块大小（字符）
+    chunk-size: 500
+    # 分块重叠
+    chunk-overlap: 50
+    # 检索 Top-K
+    top-k: 4
+
+logging:
+  level:
+    com.csagent: DEBUG
+    org.springframework.ai: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
