@@ -3,11 +3,12 @@ package com.csagent.rag.store;
 import com.csagent.rag.entity.KnowledgeDocEntity;
 import com.csagent.rag.repository.KnowledgeDocRepository;
 import com.csagent.rag.service.KnowledgeDoc;
-import com.csagent.rag.support.JsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +28,16 @@ public class JdbcKnowledgeDocStore implements KnowledgeDocStore {
 
     private final KnowledgeDocRepository repository;
 
-    public JdbcKnowledgeDocStore(KnowledgeDocRepository repository) {
+    /**
+     * 用容器里的 Jackson（Boot 4 → Jackson 3）。
+     * 早期这里注入的是 Jackson 2 的 {@code com.fasterxml.jackson.databind.ObjectMapper}，
+     * 而容器只提供 Jackson 3 的 bean，表现为启动直接失败 "No qualifying bean of type ObjectMapper"。
+     */
+    private final ObjectMapper objectMapper;
+
+    public JdbcKnowledgeDocStore(KnowledgeDocRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -80,8 +89,8 @@ public class JdbcKnowledgeDocStore implements KnowledgeDocStore {
      */
     private String writePreviews(List<String> previews) {
         try {
-            return JsonCodec.write(previews == null ? List.of() : previews);
-        } catch (Exception e) {
+            return objectMapper.writeValueAsString(previews == null ? List.of() : previews);
+        } catch (RuntimeException e) {
             log.warn("文档分块预览序列化失败，已存空数组", e);
             return "[]";
         }
@@ -92,8 +101,9 @@ public class JdbcKnowledgeDocStore implements KnowledgeDocStore {
             return new ArrayList<>();
         }
         try {
-            return JsonCodec.readStringList(json);
-        } catch (Exception e) {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (RuntimeException e) {
             log.warn("文档分块预览反序列化失败，返回空列表");
             return new ArrayList<>();
         }

@@ -2,11 +2,11 @@ package com.csagent.rag.vector;
 
 import com.csagent.rag.entity.KnowledgeChunkEntity;
 import com.csagent.rag.repository.KnowledgeChunkRepository;
-import com.csagent.rag.support.JsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,8 +29,12 @@ public class JdbcVectorStore implements VectorStore {
 
     private final KnowledgeChunkRepository repository;
 
-    public JdbcVectorStore(KnowledgeChunkRepository repository) {
+    /** 容器提供的 Jackson 3 实例（见 JdbcKnowledgeDocStore 中的同款说明） */
+    private final ObjectMapper objectMapper;
+
+    public JdbcVectorStore(KnowledgeChunkRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -109,8 +113,8 @@ public class JdbcVectorStore implements VectorStore {
 
     private String writeVector(String chunkId, float[] vector) {
         try {
-            return JsonCodec.write(vector);
-        } catch (Exception e) {
+            return objectMapper.writeValueAsString(vector);
+        } catch (RuntimeException e) {
             // 写不进去就不能落库：没有向量的知识块在检索里永远命中不了，
             // 存下来只会让"文档显示已摄入但搜不到"变成一个更难查的问题
             throw new IllegalStateException("向量序列化失败：" + chunkId, e);
@@ -122,8 +126,8 @@ public class JdbcVectorStore implements VectorStore {
             return null;
         }
         try {
-            return JsonCodec.read(json, float[].class);
-        } catch (Exception e) {
+            return objectMapper.readValue(json, float[].class);
+        } catch (RuntimeException e) {
             log.warn("向量解析失败，已跳过：chunk={}", chunkId);
             return null;
         }

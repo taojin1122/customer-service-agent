@@ -26,10 +26,10 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
+        <!-- 已移除 com.fasterxml.jackson.core:jackson-databind（Jackson 2）。
+             Spring Boot 4 内部用的是 Jackson 3（tools.jackson），业务代码也统一到 3.x；
+             2.x 只作为 jjwt-jackson 的传递依赖存在，不再显式声明。
+             本模块没有任何类 import Jackson，声明它是历史遗留。 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

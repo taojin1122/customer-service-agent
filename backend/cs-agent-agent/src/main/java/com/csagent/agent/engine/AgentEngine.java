@@ -19,9 +19,11 @@ import com.csagent.rag.service.KnowledgeService;
 import com.csagent.tool.definition.ToolDefinition;
 import com.csagent.tool.registry.ToolRegistry;
 import com.csagent.tool.result.ToolResult;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+// Spring Boot 4 用 Jackson 3（包名 tools.jackson），2.x 的 com.fasterxml.jackson 只剩 jjwt 内部在用。
+// 业务代码统一到 3.x：混用两代会让"容器里有 ObjectMapper 却注入不进来"这类问题反复出现。
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -98,14 +100,17 @@ public class AgentEngine {
     // 人设：从配置注入而非写死在代码里。项目是通用智能客服框架，换行业只改配置不改代码。
     private final String agentName;
     private final String companyName;
-    // Jackson 的 JSON 工具：用来把 LLM 返回的字符串解析成结构化决策对象。整个引擎共用一个实例足矣。
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Jackson 的 JSON 工具：用来把 LLM 返回的字符串解析成结构化决策对象。
+    // 用容器里的 bean 而不是 new 一个：Spring Boot 已配好忽略未知字段等宽容策略，
+    // 而 LLM 输出的 JSON 经常多带几个字段，自建实例会因此解析失败。
+    private final ObjectMapper objectMapper;
 
     public AgentEngine(ChatService chatService, MemoryService memoryService,
                        ToolRegistry toolRegistry, KnowledgeService knowledgeService,
                        SystemPromptBuilder systemPromptBuilder,
                        PromptInjectionGuard promptInjectionGuard, IntentClassifier intentClassifier,
                        AgentMetrics agentMetrics,
+                       ObjectMapper objectMapper,
                        @Value("${cs-agent.persona.name:小易}") String agentName,
                        @Value("${cs-agent.persona.company:智能客服中心}") String companyName) {
         this.chatService = chatService;
@@ -116,6 +121,7 @@ public class AgentEngine {
         this.promptInjectionGuard = promptInjectionGuard;
         this.intentClassifier = intentClassifier;
         this.agentMetrics = agentMetrics;
+        this.objectMapper = objectMapper;
         this.agentName = agentName;
         this.companyName = companyName;
     }
