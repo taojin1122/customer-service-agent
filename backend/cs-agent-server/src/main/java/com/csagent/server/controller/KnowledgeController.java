@@ -1,5 +1,7 @@
 package com.csagent.server.controller;
 
+import com.csagent.common.constant.RoleConstants;
+import com.csagent.common.context.RequireRole;
 import com.csagent.common.exception.BusinessException;
 import com.csagent.common.result.Result;
 import com.csagent.rag.service.KnowledgeDoc;
@@ -17,10 +19,18 @@ import java.util.List;
 
 /**
  * 知识库 API：文档上传、列表、删除、检索测试。
+ *
+ * <p><b>整个类限定 ADMIN</b>：知识库影响的是该租户<b>所有</b>对话的回答质量。
+ * 坐席误删一段文档，全租户的机器人都会开始答错，而且很难定位到是谁改的。
+ * 这属于"配置权"而非"操作权"，按 AGENTS.md §9.3 的权限矩阵归管理员。</p>
+ *
+ * <p>注意：前端菜单同样对 AGENT 隐藏了知识库入口，但那只是体验层。
+ * 真正的边界是这里的注解——隐藏菜单挡不住直接调接口的人。</p>
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/knowledge")
+@RequireRole(RoleConstants.ADMIN)
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
