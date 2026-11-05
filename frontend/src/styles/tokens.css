@@ -1,0 +1,207 @@
+/**
+ * 设计令牌（Design Tokens）
+ *
+ * 唯一色彩与尺寸来源，对应 design-system/cs-agent/MASTER.md。
+ * 组件里禁止写死十六进制颜色或像素值——否则深色主题切换时会出现"部分区域没变"的破图。
+ *
+ * 命名约定：--color-* 颜色 / --text-* 字号 / --space-* 间距 / --radius-* 圆角 / --shadow-* 阴影
+ */
+
+:root {
+  /* ========== 品牌色 ==========
+     蓝色只用于主操作，每屏最多一个。使用过多会让界面失去重点。 */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-active: #1e40af;
+  --color-primary-soft: #eff6ff;
+
+  /* ========== 强调色 ==========
+     硬约束：只允许用于「转人工」「结束会话」「升级工单」三处。
+     泛用会稀释真正的警示，见 MASTER.md §2.2 */
+  --color-accent: #ea580c;
+  --color-accent-hover: #c2410c;
+  --color-accent-soft: #fff7ed;
+
+  /* ========== 中性色 ==========
+     承担 90% 的界面面积。层级靠这里的明度差表达，不靠阴影 */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-sidebar: #1e293b;
+  --color-sidebar-hover: #334155;
+  --color-sidebar-active: #2563eb;
+
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* ========== 语义色 ==========
+     仅表示状态，且必须配文字或图标，不能只靠颜色传达（无障碍要求） */
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0ea5e9;
+
+  /* ========== 品牌活力色 ==========
+     用于渐变、数据可视化与少量强调点缀，不用于正文和表单控件。
+     规则见 MASTER.md §2.5：装饰可以有色，信息载体不行 */
+  --color-violet: #7c3aed;
+  --color-cyan: #06b6d4;
+  --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+
+  /* ========== 字体 ==========
+     中西文分别声明的原因：Plus Jakarta Sans 无中文字形，
+     不显式写 PingFang SC / Microsoft YaHei 会 fallback 到宋体（衬线），与西文风格冲突 */
+  --font-sans: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-number: "Plus Jakarta Sans", ui-monospace, "SF Mono", Consolas, monospace;
+
+  /* 字号阶梯：正文 14px 而非 16px，后台一屏要容纳更多行（MASTER.md §3.2） */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --leading-xs: 18px;
+  --leading-sm: 20px;
+  --leading-base: 22px;
+  --leading-lg: 24px;
+  --leading-xl: 28px;
+
+  /* ========== 间距（密度 8/10） ========== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ========== 圆角 ========== */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ========== 阴影 ==========
+     只用两级且极轻。层级主要靠背景色差 + 1px 边框 */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+
+  /* ========== 布局尺寸 ========== */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --header-height: 56px;
+  --table-row-height: 48px;
+  --widget-width: 380px;
+  --widget-height: 600px;
+
+  /* ========== 动效 ==========
+     150-250ms 是"有反馈但不拖沓"的区间。超过 300ms 会被感知为卡顿 */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/**
+ * 深色主题：只覆盖变量，不改组件样式。
+ * 组件里出现 if (dark) 分支意味着两套样式要同步维护，必然会漏。
+ */
+[data-theme="dark"] {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+  --color-primary-active: #2563eb;
+  --color-primary-soft: #1e293b;
+
+  --color-accent: #fb923c;
+  --color-accent-hover: #fdba74;
+  --color-accent-soft: #2c1a0e;
+
+  --color-bg: #0f172a;
+  --color-surface: #1b2336;
+  --color-sidebar: #131b2e;
+  --color-sidebar-hover: #1f2a42;
+  --color-sidebar-active: #3b82f6;
+
+  --color-text: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
+  --color-text-inverse: #0f172a;
+
+  --color-border: #2a3448;
+  --color-border-strong: #475569;
+
+  --color-success: #22c55e;
+  --color-success-soft: #0f2417;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #2a1f07;
+  --color-danger: #ef4444;
+  --color-danger-soft: #2a1215;
+
+  /* 深色下阴影几乎不可见，改用更强的边框区分层级 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+/**
+ * Element Plus 变量映射。
+ *
+ * 必须映射而不是逐组件覆写：Element Plus 内部大量组件依赖这些变量，
+ * 漏映射一个就会出现"表格是新的、分页还是默认蓝"的割裂。
+ */
+:root {
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: var(--color-primary-hover);
+  --el-color-primary-light-5: #93c5fd;
+  --el-color-primary-light-7: #bfdbfe;
+  --el-color-primary-light-8: var(--color-primary-soft);
+  --el-color-primary-light-9: var(--color-primary-soft);
+  --el-color-primary-dark-2: var(--color-primary-active);
+
+  --el-color-success: var(--color-success);
+  --el-color-warning: var(--color-warning);
+  --el-color-danger: var(--color-danger);
+  --el-color-error: var(--color-danger);
+  --el-color-info: var(--color-text-tertiary);
+
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-secondary);
+  --el-text-color-placeholder: var(--color-text-tertiary);
+  --el-text-color-disabled: var(--color-text-tertiary);
+
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-bg);
+  --el-bg-color-overlay: var(--color-surface);
+
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border);
+  --el-border-color-lighter: var(--color-border);
+  --el-border-color-extra-light: var(--color-border);
+  --el-border-color-dark: var(--color-border-strong);
+  --el-border-color-darker: var(--color-border-strong);
+
+  --el-fill-color: var(--color-bg);
+  --el-fill-color-light: var(--color-bg);
+  --el-fill-color-lighter: var(--color-bg);
+  --el-fill-color-blank: var(--color-surface);
+
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-small: var(--radius-sm);
+  --el-border-radius-round: var(--radius-full);
+
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: var(--text-base);
+  --el-font-size-small: var(--text-sm);
+  --el-font-size-extra-small: var(--text-xs);
+
+  --el-box-shadow-light: var(--shadow-sm);
+  --el-box-shadow: var(--shadow-md);
+}

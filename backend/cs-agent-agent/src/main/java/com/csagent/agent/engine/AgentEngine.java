@@ -5,8 +5,10 @@ import com.csagent.agent.intent.IntentClassifier;
 import com.csagent.agent.intent.IntentResult;
 import com.csagent.agent.model.AgentDecision;
 import com.csagent.agent.model.ChatRequest;
+import com.csagent.agent.observability.AgentMetrics;
 import com.csagent.agent.security.PromptInjectionGuard;
 import com.csagent.common.constant.AgentConstants;
+import com.csagent.common.context.CurrentUser;
 import com.csagent.common.exception.BusinessException;
 import com.csagent.llm.service.ChatService;
 import com.csagent.memory.service.MemoryService;
@@ -25,6 +27,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -52,6 +55,10 @@ import java.util.Map;
  * 1. 提示注入防护 {@link PromptInjectionGuard}：用户话进模型之前先过安全闸门，挡掉"忽略指令/套提示词"等攻击。
  * 2. 意图识别 {@link IntentClassifier}：先判断用户想干嘛（报修/账单/问候…），用于业务/闲聊分流，并把意图告诉模型。</p>
  *
+ * <p><b>这两道关卡与指标埋点只在本类执行一次，上层门面不得再做</b>：{@code ChatAgentService} 曾经也调过
+ * 一遍 {@code checkUserInput} 和 {@code classify}，导致同一请求被校验两次、意图事件被推两遍给前端。
+ * 若将来新增入口（网关、定时任务、异步队列），请统一调 {@link #stream}，不要把安全检测"补"在外层。</p>
+ *
  * <p>一次对话的完整流程：
  * <pre>
  * 1. 安全闸门：提示注入检测（不通过直接拒答，不调模型）
@@ -68,21 +75,37 @@ public class AgentEngine {
 
     // 以下依赖通过构造器注入（Spring 推荐做法，便于测试与解耦）。
     // 它们当前是"进程内调用"，拆分到微服务后（见 docs/微服务拆分执行计划.md）会变成远程 Feign 调用，但本引擎接口不变。
-    private final ChatService chatService;          // 调大模型（拆分后走 model-gateway）
-    private final MemoryService memoryService;       // 会话/消息记忆（拆分后走 conversation-service）
-    private final ToolRegistry toolRegistry;         // 工具注册表（账单/报修/服务信息等）
-    private final KnowledgeService knowledgeService; // 知识库检索（拆分后走 rag-service）
-    private final SystemPromptBuilder systemPromptBuilder; // 系统提示词组装（角色人设）
+    // 调大模型（拆分后走 model-gateway）
+    private final ChatService chatService;
+    // 会话/消息记忆（拆分后走 conversation-service）
+    private final MemoryService memoryService;
+    // 工具注册表（账单/报修/服务信息等）
+    private final ToolRegistry toolRegistry;
+    // 知识库检索（拆分后走 rag-service）
+    private final KnowledgeService knowledgeService;
+    // 系统提示词组装（角色人设）
+    private final SystemPromptBuilder systemPromptBuilder;
     // 安全与意图：这两个组件本就是为"前置拦截/分流"设计的，必须在 run() 最前面调用，而不是等模型返回后。
-    private final PromptInjectionGuard promptInjectionGuard; // 提示注入防护（入口闸门）
-    private final IntentClassifier intentClassifier;         // 意图识别（业务/闲聊分流）
+    // 提示注入防护（入口闸门）
+    private final PromptInjectionGuard promptInjectionGuard;
+    // 意图识别（业务/闲聊分流）
+    private final IntentClassifier intentClassifier;
+    // 指标埋点（调用次数/成功率/意图分布）。刻意放在引擎内部而不是上层门面：只有这里同时掌握
+    // "识别出的意图 + 本轮耗时 + 是否成功"三样东西；放门面就得再跑一次意图识别才能拿到意图类型。
+    private final AgentMetrics agentMetrics;
+    // 人设：从配置注入而非写死在代码里。项目是通用智能客服框架，换行业只改配置不改代码。
+    private final String agentName;
+    private final String companyName;
     // Jackson 的 JSON 工具：用来把 LLM 返回的字符串解析成结构化决策对象。整个引擎共用一个实例足矣。
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AgentEngine(ChatService chatService, MemoryService memoryService,
                        ToolRegistry toolRegistry, KnowledgeService knowledgeService,
                        SystemPromptBuilder systemPromptBuilder,
-                       PromptInjectionGuard promptInjectionGuard, IntentClassifier intentClassifier) {
+                       PromptInjectionGuard promptInjectionGuard, IntentClassifier intentClassifier,
+                       AgentMetrics agentMetrics,
+                       @Value("${cs-agent.persona.name:小易}") String agentName,
+                       @Value("${cs-agent.persona.company:智能客服中心}") String companyName) {
         this.chatService = chatService;
         this.memoryService = memoryService;
         this.toolRegistry = toolRegistry;
@@ -90,6 +113,9 @@ public class AgentEngine {
         this.systemPromptBuilder = systemPromptBuilder;
         this.promptInjectionGuard = promptInjectionGuard;
         this.intentClassifier = intentClassifier;
+        this.agentMetrics = agentMetrics;
+        this.agentName = agentName;
+        this.companyName = companyName;
     }
 
     /**
@@ -98,11 +124,18 @@ public class AgentEngine {
      * <p><b>为什么用 Flux.create 包一层</b>：Spring AI 的 chat 调用本身是阻塞/异步的，而我们要给前端推的是
      * "思考、工具调用、结果、回答"一串事件。Flux.create 让我们能手动控制每个事件的发射时机（sink.next），
      * 既把内部同步逻辑桥接成响应式流，又能在异常时统一兜底发一个 error 事件并正常结束流。</p>
+     *
+     * <p><b>为什么把身份当参数传进来，而不是在本方法里读 TenantContext</b>：Spring MVC 返回
+     * {@code Flux} 时会把订阅交给异步任务执行，此时 ThreadLocal 已经失效（换线程了）。
+     * 由调用方在仍在请求线程上的时候取好 {@link CurrentUser} 再传进来，
+     * 是一条明确的数据链，不依赖隐式的线程状态。</p>
+     *
+     * @param user 当前登录身份，提供会话归属所需的 tenantId / userId
      */
-    public Flux<AgentEvent> stream(ChatRequest request) {
+    public Flux<AgentEvent> stream(ChatRequest request, CurrentUser user) {
         return Flux.create(sink -> {
             try {
-                run(request, sink);
+                run(request, sink, user);
                 sink.complete();
             } catch (Exception e) {
                 // 任何未捕获异常都转成一个 error 事件，保证前端流能正常关闭而不是一直挂着。
@@ -116,8 +149,31 @@ public class AgentEngine {
     /**
      * 核心执行逻辑（同步写法，由 stream() 包成流式）。
      * 顺序：安全闸门 → 意图识别 → 建/取会话 → 组上下文 → 进 ReAct 循环 → 兜底。
+     *
+     * <p><b>为什么这里只是薄薄一层 try/catch，真正逻辑在 {@link #runCore}</b>：
+     * 指标需要区分成功/失败，而失败是通过抛异常传出来的。把埋点集中在异常出口记一次，
+     * 就不必在每个 throw 点上重复写 record，runCore 也能保持线性、好读。
+     * {@link RunContext} 负责把"已识别的意图 + 起始时间"从内层带到外层 catch——
+     * 一旦抛了异常，内层已经无法用返回值把这两样东西交出来。</p>
      */
-    private void run(ChatRequest request, FluxSink<AgentEvent> sink) {
+    private void run(ChatRequest request, FluxSink<AgentEvent> sink, CurrentUser user) {
+        RunContext ctx = new RunContext();
+        try {
+            runCore(request, sink, ctx, user);
+        } catch (RuntimeException e) {
+            // 失败也要计数：漏记会让 /api/system/metrics 的成功率虚高（分母少了失败的调用）。
+            agentMetrics.record(ctx.intentType, null, false, 0, 0, ctx.elapsedMs());
+            throw e;
+        }
+    }
+
+    /**
+     * 一次对话的真实执行体，见 {@link #run} 的流程说明。
+     *
+     * @param ctx  携带识别出的意图与起始时间，供外层埋点使用；识别前 intentType 为 null
+     * @param user 当前登录身份，用于会话归属与企业级租户校验
+     */
+    private void runCore(ChatRequest request, FluxSink<AgentEvent> sink, RunContext ctx, CurrentUser user) {
         // 防御：空消息直接拦掉，避免把无意义请求打给大模型浪费调用。
         if (request.getMessage() == null || request.getMessage().isBlank()) {
             throw new BusinessException("消息内容不能为空");
@@ -131,6 +187,7 @@ public class AgentEngine {
         if (!sec.isSafe()) {
             log.warn("[安全] 拦截疑似提示注入，原因：{}", sec.getReason());
             // 注意：被拦截的消息不落库、不建会话——它是攻击输入，无需保留为对话历史。
+            // 同样不计入指标：它是一次被拒绝的请求，而非有效服务调用；计入会污染成功率与平均耗时。
             sink.next(AgentEvent.of("answer", "抱歉，您的问题包含不安全的内容，我暂时无法处理。如有紧急问题，请联系人工客服。"));
             sink.next(AgentEvent.of("done", ""));
             return;
@@ -140,9 +197,14 @@ public class AgentEngine {
         // 在组装上下文之前就识别意图：① 推给前端做路由/展示；② 下面 buildSystemPrompt 会把意图写进系统提示词，
         // 让模型知道用户大概想干嘛（比如识别出"账单查询"就更有针对性地走账单工具/知识）。
         IntentResult intent = intentClassifier.classify(request.getMessage());
+        // 交给 RunContext：异常路径上外层要靠它把"这次是哪个意图失败"记进指标。
+        ctx.intentType = intent.getType();
         try {
+            // 字段名 description / confidence 是与前端（chat/index.vue 的 formatTrace）的约定，
+            // 不要简化成 desc / score：改了前端会显示 "undefined（置信度 NaN%）"。
             sink.next(AgentEvent.of("intent", objectMapper.writeValueAsString(Map.of(
-                    "type", intent.getType(), "desc", intent.getDescription(), "score", intent.getConfidence()))));
+                    "type", intent.getType(), "description", intent.getDescription(),
+                    "confidence", intent.getConfidence()))));
         } catch (Exception e) {
             // 意图事件失败不影响主流程，仅打日志降级。
             log.warn("[Agent] 意图事件序列化失败", e);
@@ -150,7 +212,7 @@ public class AgentEngine {
 
         // 会话管理：前端若没带 conversationId（首轮对话），就新建一个；带了就校验它确实存在。
         // 为什么校验存在：防止用户随便编一个 id 去"碰"别人的会话（多租户隔离的一道基础防线）。
-        String conversationId = ensureConversation(request);
+        String conversationId = ensureConversation(request, user);
 
         // 组装消息上下文。messages 就是发给大模型的"完整对话历史"，顺序很重要：系统提示词必须最前。
         // 用滑动窗口而非全量历史：对话越长，token 越贵、模型越容易跑偏，所以记忆层只回放最近若干轮。
@@ -255,6 +317,8 @@ public class AgentEngine {
                 sink.next(AgentEvent.of("answer", finalAnswer));
                 sink.next(AgentEvent.of("done", ""));
                 log.info("[Agent] 完成回答（{} 轮），会话：{}", iterations, conversationId);
+                // 正常出口才算"成功一次"；被折叠进异常路径的情况由 run() 的 catch 记失败。
+                agentMetrics.record(intent.getType(), null, true, 0, 0, ctx.elapsedMs());
                 return;
             }
         }
@@ -265,18 +329,46 @@ public class AgentEngine {
         memoryService.appendMessage(conversationId, AgentConstants.ROLE_ASSISTANT, fallback, null);
         sink.next(AgentEvent.of("answer", fallback));
         sink.next(AgentEvent.of("done", ""));
+        // 触顶兜底同样算"本次调用正常结束"（有回答给用户），因此计成功而非失败，与旧门面口径一致。
+        agentMetrics.record(intent.getType(), null, true, 0, 0, ctx.elapsedMs());
     }
 
     /**
-     * 解析/创建会话。
-     * <p>为什么分两种：① 首轮没 id → 新建（大模型客服每次新对话都该有独立会话，便于后续按会话查历史）；
-     * ② 带了 id 但库里没有 → 直接报错，而不是悄悄新建，防止用户用任意字符串"嗅探"出空白会话。</p>
+     * 单轮执行的上下文。
+     *
+     * <p><b>为什么需要这个看起来多余的小对象</b>：指标要按意图归类，但异常发生时 {@link #runCore}
+     * 已经无法通过返回值把意图交出来。用一个只在本轮内存活的可变容器承接，比在 catch 里重新调用一次
+     * {@code intentClassifier.classify} 更省，也避免"同一个请求被识别两次、结果还不一致"的隐患。</p>
      */
-    private String ensureConversation(ChatRequest request) {
-        if (request.getConversationId() == null || request.getConversationId().isBlank()) {
-            return memoryService.createConversation(request.getModelId()).getId();
+    private static final class RunContext {
+        // 识别出的意图类型；识别之前（如空消息直接抛错）保持 null，指标里记 null 即不计入意图分布
+        private String intentType;
+        private final long startMs = System.currentTimeMillis();
+
+        private long elapsedMs() {
+            return System.currentTimeMillis() - startMs;
         }
-        if (memoryService.getConversation(request.getConversationId()).isEmpty()) {
+    }
+
+    /**
+     * 解析/创建会话（带租户归属校验）。
+     *
+     * <p>三种情况：① 首轮没 id → 新建，把当前租户与坐席一并写入；
+     * ② 带了 id 但不在当前租户内 → 报错；③ 带了 id 且属于当前租户 → 沿用。</p>
+     *
+     * <p><b>②为什么报错而不是"当作新会话"</b>：若不报错，用户随便编一个 id 也能开始对话，
+     * 而前端会一直带着这个 id 请求，历史消息却永远查不到——表现为"机器人失忆"，
+     * 排查时完全看不出原因是租户不匹配。明确报错同时让"拿别人 id 试探"的行为立刻暴露。</p>
+     */
+    private String ensureConversation(ChatRequest request, CurrentUser user) {
+        // 平台账号不属于任何租户，无法拥有会话。在这里兜一道，避免下游写出 tenant_id 为 null 的脏数据
+        if (user.tenantId() == null) {
+            throw new BusinessException(403, "平台账号不能发起对话");
+        }
+        if (request.getConversationId() == null || request.getConversationId().isBlank()) {
+            return memoryService.createConversation(request.getModelId(), user.tenantId(), user.userId()).getId();
+        }
+        if (memoryService.getConversation(request.getConversationId(), user.tenantId()).isEmpty()) {
             throw new BusinessException("会话不存在：" + request.getConversationId());
         }
         return request.getConversationId();
@@ -291,9 +383,9 @@ public class AgentEngine {
      */
     private String buildSystemPrompt(ChatRequest request, IntentResult intent, FluxSink<AgentEvent> sink) {
         StringBuilder prompt = new StringBuilder();
-        // TODO 多租户：当前"小易/易乐智慧物业"是硬编码人设，生产应改为按租户从 tenant-service 下发，
-        // 否则所有租户的机器人都叫同一个名字、自称同一家公司，明显不对。
-        prompt.append(systemPromptBuilder.buildBase("小易", "易乐智慧物业"));
+        // 人设来自配置（cs-agent.persona.*）：项目是通用客服框架，换行业只改配置，不动代码。
+        // TODO 多租户：生产应改为按租户从 tenant-service 动态下发，而非全局共享一份人设。
+        prompt.append(systemPromptBuilder.buildBase(agentName, companyName));
 
         // 把识别出的意图告诉模型：让它知道用户大概想干嘛，回答更聚焦（如"账单查询"就优先走账单相关工具/知识）。
         prompt.append("\n\n[用户意图] ").append(intent.getDescription())

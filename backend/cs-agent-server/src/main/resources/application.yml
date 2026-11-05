@@ -13,6 +13,10 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 50MB
+  jpa:
+    # 关闭 open-in-view：它会在整个视图渲染期间持有数据库连接。
+    # 本项目有 SSE 长连接，一次对话可能挂住几十秒，开着会让连接池被流式请求吃光
+    open-in-view: false
   # 本项目通过 LlmRegistry 手动构建 OpenAI 兼容模型（DeepSeek），
   # 排除 Spring AI 的 OpenAI 自动配置，避免要求 spring.ai.openai.api-key
   autoconfigure:
@@ -23,9 +27,30 @@ spring:
       - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
       - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
       - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
+      # 排除 Spring Security 的默认账号自动配置：本项目用 JWT 鉴权，不需要内存用户。
+      # 不排除时启动日志会打印 "Using generated security password: xxx"，
+      # 让人误以为系统里存在一个可用的默认账号，排障时会白试很久。
+      # 注意 Boot 4 已把该类从 autoconfigure 包迁到 security.autoconfigure。
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
 
 # ==================== 智能客服 Agent 配置 ====================
 cs-agent:
+  # 人设：本框架与行业无关，换行业/换公司只改这里（多租户场景下应由 tenant-service 下发）
+  persona:
+    name: 小易
+    company: 智能客服中心
+  auth:
+    jwt:
+      # 签名密钥：生产必须用环境变量 CS_AGENT_JWT_SECRET 覆盖，且不短于 32 字节。
+      # 此处默认值只服务本地开发，禁止在任何对外部署中使用（AGENTS.md §2.2）。
+      secret: ${CS_AGENT_JWT_SECRET:cs-agent-dev-only-secret-change-me-32bytes}
+      # 令牌有效期（分钟）：720 = 12 小时，覆盖一个工作班次
+      expire-minutes: 720
+  init:
+    # 首次启动创建演示租户与账号。默认关闭，仅 application-dev.yml 打开；
+    # 生产误开等于开放 admin/admin123 后门
+    seed-enabled: false
+    demo-password: ${CS_AGENT_DEMO_PASSWORD:admin123}
   llm:
     # 默认模型 id（对应 models 列表中的 id）
     default-model: deepseek

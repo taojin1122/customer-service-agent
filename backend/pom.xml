@@ -20,6 +20,9 @@
 
     <modules>
         <module>cs-agent-common</module>
+        <!-- 身份与租户：被 memory / rag / agent 反向依赖（它们都要按租户过滤），
+             因此必须放在这些业务模块之前，且自身不得依赖它们中的任何一个 -->
+        <module>cs-agent-auth</module>
         <module>cs-agent-llm</module>
         <module>cs-agent-prompt</module>
         <module>cs-agent-tool</module>
@@ -37,6 +40,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-ai.version>2.0.2</spring-ai.version>
         <tika.version>2.9.2</tika.version>
+        <!-- JWT 签发/校验库。选 jjwt 而非 java-jwt：API 更细但错误信息更明确
+             （过期、签名不匹配、格式错误能区分开），排查登录问题时不至于只看到"解析失败" -->
+        <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
     <dependencyManagement>
@@ -52,6 +58,28 @@
                 <groupId>com.csagent</groupId>
                 <artifactId>cs-agent-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.csagent</groupId>
+                <artifactId>cs-agent-auth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>com.csagent</groupId>

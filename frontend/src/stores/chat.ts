@@ -53,6 +53,22 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(msg)
   }
 
+  /**
+   * 清空本地缓存（退出登录时调用）。
+   *
+   * 必须调：Pinia 的 setup store 不会随页面跳转自动重置，同一台电脑换人登录时，
+   * 下一个用户会在首个接口返回前先看到上一个人的会话标题与聊天记录。
+   * 这类"闪现"通常只有一两百毫秒，但属于内部数据泄露。
+   *
+   * 注意只清前端缓存，不删服务端数据——退出登录不等于删除会话。
+   */
+  function reset() {
+    conversations.value = []
+    currentConversationId.value = ''
+    messages.value = []
+    streaming.value = false
+  }
+
   /** 更新最后一条 assistant 消息（流式增量） */
   function updateLastAssistant(delta: string, trace: AgentTraceItem[]) {
     const last = messages.value[messages.value.length - 1]
@@ -72,6 +88,7 @@ export const useChatStore = defineStore('chat', () => {
     switchConversation,
     removeConversation,
     pushMessage,
-    updateLastAssistant
+    updateLastAssistant,
+    reset
   }
 })

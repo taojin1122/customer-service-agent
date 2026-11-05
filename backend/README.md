@@ -2,7 +2,7 @@
 
 > 版本：v1.0 ｜ 日期：2026-09-20
 > 定位：本文件是 backend 目录的**全局开发说明**——讲清整体架构、模块全景、跨服务约定、开发规范、本地起法。
-> 模块级实现细节见各模块自己的文档（如 `cs-agent-agent/agent.md`）。本文档与 `../docs/微服务拆分执行计划.md` 互补：计划讲"怎么拆"，本文档讲"现在是什么、怎么开发"。
+> 模块级实现细节见各模块自己的文档（如 `cs-agent-agent/AGENTS.md`）。本文档与 `../docs/微服务拆分执行计划.md` 互补：计划讲"怎么拆"，本文档讲"现在是什么、怎么开发"。
 
 ---
 
@@ -25,7 +25,7 @@
 | 数据库 | MySQL（`application-mysql.yml`） | PostgreSQL 14+ + PGVector + RLS |
 | 向量库 | `SimpleMemoryVectorStore`（内存 demo） | PGVector |
 | Embedding | `LocalHashEmbeddingService`（本地哈希伪） | 真实 embedding API |
-| 多租户 | 无（grep 全仓库零结果） | RLS + `tenant_id` 拦截器双防线 |
+| 多租户 | 无（全仓库零 `tenant_id`） | 全配置租户化：`t_tenant` + `t_tenant_config` + `tenant_id` 隔离 + RLS 双防线（方案见根 `AGENTS.md` §1.1） |
 | 服务发现 | 无 | Nacos |
 
 > 现状盘点见 `../docs/微服务拆分执行计划.md` §1。这些代码是**资产**，迁移时按职责归属到对应服务，不重写。
@@ -59,7 +59,7 @@
 | `model-gateway` | `cs-agent-llm` | model-gateway（独立） | 8087 | 模型注册/路由/BYOM/代管兜底；**慢调用隔离** | 已有（llm 4 类） |
 | `common`（共享库，非进程） | `cs-agent-common` | — | — | 切面/异常/Result/IdUtil/`TenantContext`（新增） | 已有（4 类） |
 
-> 注：`server` 的控制器按职责拆进各服务；APISIX 作边缘网关后 `server` 不再作统一入口（本期删除，路由由 APISIX 直达服务）。模块级细节：`cs-agent-agent/agent.md` 已覆盖 agent 模块。
+> 注：`server` 的控制器按职责拆进各服务；APISIX 作边缘网关后 `server` 不再作统一入口（本期删除，路由由 APISIX 直达服务）。模块级细节：`cs-agent-agent/AGENTS.md` 已覆盖 agent 模块。
 
 ---
 
@@ -107,7 +107,7 @@
 
 ## 6. 全局开发规范
 
-### 6.1 强制代码注释（源自 `cs-agent-agent/agent.md` §0，扩展到全 backend）
+### 6.1 强制代码注释（源自 `cs-agent-agent/AGENTS.md` §0，扩展到全 backend）
 > 用户非 Agent / 微服务出身，代码必须讲清"为什么"，否则未来不敢改。
 
 1. 每段逻辑写"为什么"——不写 `// 解析决策`，写 `// 解析 LLM 的 JSON：LLM 偶尔用 Markdown 包裹，先剥离再 parse，否则整轮废掉`
@@ -158,7 +158,7 @@ java -jar cs-agent-server/target/cs-agent-server-*.jar
 ## 8. 模块级文档索引
 | 模块 | 文档 | 说明 |
 |---|---|---|
-| `cs-agent-agent` | `cs-agent-agent/agent.md` | Agent 引擎、意图、提示注入防护、加工具/意图约定 |
+| `cs-agent-agent` | `cs-agent-agent/AGENTS.md` | Agent 引擎、意图、提示注入防护、加工具/意图约定 |
 | 其余模块 | （待补） | 建议每个模块沉淀一份 `xxx.md`，本文件只讲全局 |
 
 ---

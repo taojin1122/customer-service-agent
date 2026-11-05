@@ -20,6 +20,10 @@
         </dependency>
         <dependency>
             <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-auth</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.csagent</groupId>
             <artifactId>cs-agent-llm</artifactId>
         </dependency>
         <dependency>

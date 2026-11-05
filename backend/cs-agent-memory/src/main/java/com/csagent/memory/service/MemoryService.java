@@ -1,6 +1,7 @@
 package com.csagent.memory.service;
 
 import com.csagent.common.constant.AgentConstants;
+import com.csagent.common.exception.BusinessException;
 import com.csagent.memory.entity.ConversationEntity;
 import com.csagent.memory.entity.MessageEntity;
 import com.csagent.memory.repository.ConversationRepository;
@@ -42,13 +43,19 @@ public class MemoryService {
     }
 
     /**
-     * 创建会话
+     * 创建会话，并记下它属于哪个租户、哪个坐席。
+     *
+     * <p>租户与坐席由调用方从 {@code TenantContext} 取出后显式传入，
+     * 而不是在本方法内部读 ThreadLocal：SSE 流式响应会在切换线程后调用到这里，
+     * ThreadLocal 已失效，内部读会拿到 null，最终写成"无主会话"（谁都查不到，或谁都能查到）。</p>
      */
-    public ConversationEntity createConversation(String modelId) {
+    public ConversationEntity createConversation(String modelId, String tenantId, String userId) {
         ConversationEntity entity = new ConversationEntity();
         entity.setId(UUID.randomUUID().toString().replace("-", ""));
         entity.setTitle("新会话");
         entity.setModelId(modelId);
+        entity.setTenantId(tenantId);
+        entity.setUserId(userId);
         entity.setDeleted(false);
         entity.setCreateTime(LocalDateTime.now());
         entity.setUpdateTime(LocalDateTime.now());
@@ -56,28 +63,61 @@ public class MemoryService {
     }
 
     /**
-     * 会话列表
+     * 会话列表。
+     *
+     * @param tenantWide 为 true 时返回本租户全部会话（管理员视角），
+     *                   为 false 时只返回当前坐席自己的会话。
+     *                   <b>这个判断不能交给前端</b>：前端传什么参数都不能影响返回范围，
+     *                   否则坐席改一下请求就能看到全租户的对话。
      */
-    public List<ConversationEntity> listConversations() {
-        return conversationRepository.findByDeletedFalseOrderByUpdateTimeDesc();
+    public List<ConversationEntity> listConversations(String tenantId, String userId, boolean tenantWide) {
+        if (tenantWide) {
+            return conversationRepository.findByTenantIdAndDeletedFalseOrderByUpdateTimeDesc(tenantId);
+        }
+        return conversationRepository.findByTenantIdAndUserIdAndDeletedFalseOrderByUpdateTimeDesc(tenantId, userId);
     }
 
     /**
-     * 获取会话
+     * 获取会话，限定在当前租户内。
+     *
+     * <p>返回空表示"不存在或不属于你"——两种情况对调用方是同一件事，
+     * 分开提示会变成探测别人会话是否存在的接口。</p>
      */
-    public Optional<ConversationEntity> getConversation(String conversationId) {
-        return conversationRepository.findById(conversationId);
+    public Optional<ConversationEntity> getConversation(String conversationId, String tenantId) {
+        return conversationRepository.findByIdAndTenantId(conversationId, tenantId);
     }
 
     /**
-     * 删除会话（逻辑删除）
+     * 删除会话（逻辑删除）。
+     *
+     * <p>两级校验：先按租户查（跨租户一律视为"不存在"，不泄露对方会话是否存在），
+     * 再按坐席判断（同租户内坐席不能删同事的会话，管理员可以）。</p>
+     *
+     * <p>不校验归属的后果：知道会话 id 的人可以删除任意用户的对话记录。
+     * 会话 id 是 UUID，猜中概率低，但它会出现在日志、浏览器历史和分享链接里。</p>
      */
-    public void deleteConversation(String conversationId) {
-        conversationRepository.findById(conversationId).ifPresent(c -> {
-            c.setDeleted(true);
-            c.setUpdateTime(LocalDateTime.now());
-            conversationRepository.save(c);
-        });
+    public void deleteConversation(String conversationId, String tenantId, String userId, boolean tenantWide) {
+        ConversationEntity conv = requireOwnedConversation(conversationId, tenantId, userId, tenantWide);
+        conv.setDeleted(true);
+        conv.setUpdateTime(LocalDateTime.now());
+        conversationRepository.save(conv);
+    }
+
+    /**
+     * 取出会话并校验访问权，校验不过直接抛异常。
+     *
+     * <p>「跨租户」与「同租户跨坐席」给不同的错误：前者统一说"不存在"（否则等于提供
+     * 探测其它租户会话是否存在的接口），后者明确说"无权"（同事之间的可见范围是内部约定，
+     * 隐瞒反而让坐席以为系统坏了）。</p>
+     */
+    private ConversationEntity requireOwnedConversation(String conversationId, String tenantId,
+                                                        String userId, boolean tenantWide) {
+        ConversationEntity conv = conversationRepository.findByIdAndTenantId(conversationId, tenantId)
+                .orElseThrow(() -> new BusinessException(404, "会话不存在"));
+        if (!tenantWide && !userId.equals(conv.getUserId())) {
+            throw new BusinessException(403, "无权访问该会话");
+        }
+        return conv;
     }
 
     /**
@@ -117,9 +157,14 @@ public class MemoryService {
     }
 
     /**
-     * 读取会话全部消息（用于前端历史回显）
+     * 读取会话全部消息（用于前端历史回显）。
+     *
+     * <p>必须先校验会话归属再查消息：消息表本身没有 {@code tenant_id}，
+     * 只靠 {@code conversationId} 查询的话，拿到别人的会话 id 就能读到完整聊天内容。
+     * 把归属校验放在会话这一层，避免给消息表冗余存租户字段（也避免两处不一致）。</p>
      */
-    public List<MessageEntity> listMessages(String conversationId) {
+    public List<MessageEntity> listMessages(String conversationId, String tenantId, String userId, boolean tenantWide) {
+        requireOwnedConversation(conversationId, tenantId, userId, tenantWide);
         return messageRepository.findByConversationIdOrderBySeqNoAsc(conversationId);
     }
 

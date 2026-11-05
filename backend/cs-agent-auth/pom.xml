@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.csagent</groupId>
+        <artifactId>cs-agent-backend</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>cs-agent-auth</artifactId>
+    <name>cs-agent-auth</name>
+    <description>身份与租户：租户/账号/角色、JWT 签发校验、鉴权过滤器与角色拦截</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.csagent</groupId>
+            <artifactId>cs-agent-common</artifactId>
+        </dependency>
+
+        <!-- 鉴权过滤器依赖 HttpServletRequest，且对外暴露登录接口，故需要 web 能力 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 租户/账号直接落库，不经过业务模块的 Service，避免 auth 反向依赖 memory -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- 只用它的过滤器链与 BCryptPasswordEncoder。
+             授权逻辑走自研 @RequireRole，不用 Spring Security 的 SpEL，理由见 RequireRole 注释 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

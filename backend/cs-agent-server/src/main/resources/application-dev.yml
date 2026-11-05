@@ -16,3 +16,8 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+# 开发环境才创建演示账号（租户 demo / admin / agent / platform）
+cs-agent:
+  init:
+    seed-enabled: true

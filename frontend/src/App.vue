@@ -5,24 +5,11 @@
 </template>
 
 <script setup lang="ts">
+// 全局样式（重置、排版、滚动条、tokens）统一在 main.ts 引入，
+// 组件级样式不放在这里，避免所有页面被迫共享同一份全局作用域。
 </script>
 
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html,
-body,
-#app {
-  height: 100%;
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
+<style scoped>
 .app-shell {
   height: 100%;
 }

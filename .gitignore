@@ -53,3 +53,4 @@ coverage/
 # ==================== 系统 ====================
 .DS_Store
 Thumbs.db
+AGENTS.md

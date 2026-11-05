@@ -25,9 +25,26 @@
         </div>
       </div>
       <div class="sidebar-footer">
-        <router-link to="/knowledge">
-          <el-button text><el-icon><FolderOpened /></el-icon>&nbsp;知识库管理</el-button>
+        <router-link v-if="auth.isAdmin" to="/tenant/knowledge" class="nav-entry">
+          <el-icon><FolderOpened /></el-icon>
+          <span>知识库管理</span>
         </router-link>
+
+        <div class="user-row">
+          <div class="user-meta">
+            <span class="user-name" :title="auth.displayName">{{ auth.displayName }}</span>
+            <span class="user-role">{{ roleLabel }}</span>
+          </div>
+          <button
+            class="logout-btn"
+            type="button"
+            title="退出登录"
+            aria-label="退出登录"
+            @click="handleLogout"
+          >
+            <el-icon><SwitchButton /></el-icon>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -46,7 +63,7 @@
       <div class="message-list" ref="messageListRef">
         <div v-if="store.messages.length === 0" class="empty-state">
           <el-icon :size="48" color="#c0c4cc"><ChatLineRound /></el-icon>
-          <p>您好！我是物业智能客服小易，可以帮您：</p>
+          <p>您好！我是智能客服助手小易，可以帮您：</p>
           <div class="suggestions">
             <el-tag v-for="s in suggestions" :key="s" class="suggestion-tag" @click="sendSuggestion(s)">
               {{ s }}
@@ -86,7 +103,7 @@
           v-model="inputText"
           type="textarea"
           :rows="2"
-          placeholder="请输入您的问题，如：我家水管漏水了 / 查询3-2-501的物业费"
+          placeholder="请输入您的问题，例如：我家水管漏水了 / 查询3-2-501的账单"
           resize="none"
           @keydown.enter.exact.prevent="handleSend"
         />
@@ -102,25 +119,46 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
+import { Role } from '@/constants/role'
 import { listModels } from '@/api/system'
 import { fetchSSE } from '@/utils/sse'
 import type { AgentTraceItem, ModelInfo } from '@/types'
 
+const router = useRouter()
 const store = useChatStore()
+const auth = useAuthStore()
 const inputText = ref('')
 const messageListRef = ref<HTMLElement>()
 const models = ref<ModelInfo[]>([])
 const selectedModel = ref('')
 
+/** 角色展示文案：直接把 ADMIN/AGENT 显示给客服看没有意义 */
+const roleLabel = computed(() => (auth.user?.role === Role.ADMIN ? '管理员' : '坐席'))
+
 const suggestions = [
   '我家水管漏水了',
-  '查询3-2-501的物业费',
+  '查询3-2-501的账单',
   '我家的报修单进度怎么样了',
   '你们几点下班？'
 ]
+
+/**
+ * 退出登录。
+ *
+ * 顺序不能反：先清业务缓存，再清令牌。
+ * 若先清令牌，紧接着的会话列表请求会因为 401 触发一次跳转，
+ * 与这里的 replace('/login') 撞在一起，表现为闪两次页面。
+ */
+async function handleLogout() {
+  store.reset()
+  auth.logout()
+  await router.replace('/login')
+}
 
 onMounted(async () => {
   await store.loadConversations()
@@ -296,7 +334,7 @@ async function handleSend() {
 
 .sidebar {
   width: 260px;
-  background: #1f2d3d;
+  background: var(--color-sidebar);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -365,26 +403,95 @@ async function handleSend() {
 }
 
 .sidebar-footer {
-  padding: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.sidebar-footer a {
-  color: #cfd8e3;
+.nav-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #cbd5e1;
+  font-size: 13px;
   text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-entry:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.user-name {
+  color: #fff;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.logout-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.logout-btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
 }
 
 .chat-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
+  background: var(--color-bg);
 }
 
 .chat-header {
   height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -480,13 +587,13 @@ async function handleSend() {
 }
 
 .message-row.user .bubble {
-  background: #409eff;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .message-row.assistant .bubble {
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 .trace-panel {
@@ -564,8 +671,8 @@ async function handleSend() {
 }
 
 .input-area {
-  background: #fff;
-  border-top: 1px solid #e4e7ed;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   padding: 12px 20px;
 }
 
