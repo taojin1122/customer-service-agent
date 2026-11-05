@@ -36,6 +36,13 @@ public class SecurityConfig {
             // 登录接口本身不可能要求登录
             "/api/auth/login",
             "/api/platform/auth/login",
+            // 用户侧客服窗：匿名访客入口，嵌在客户网站上，不存在登录态。
+            // 这是 AGENTS.md §8.1① 明确允许的唯一例外，其安全性由四件事共同保证：
+            // ① 独立 Controller（WidgetController），不与租户后台接口共用；
+            // ② 入口限流（WidgetRateLimiter），防止脚本刷爆 LLM 额度；
+            // ③ 强制关闭工具调用，访客只能问答，不能执行业务动作；
+            // ④ 所有按 id 的访问都校验会话属于该访客。
+            "/api/widget/**",
             // 健康检查：AGENTS.md §7 的交付验收项与容器探针都依赖它，不能要求令牌
             "/actuator/health",
             "/actuator/info",

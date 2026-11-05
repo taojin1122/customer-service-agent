@@ -15,8 +15,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 // 显式列出实体与仓储所在包：Boot 默认只扫描启动类所在包（com.csagent.server），
 // 业务模块在 com.csagent.memory / com.csagent.auth 下，不声明就找不到，
 // 表现为启动成功但 Repository 注入失败。新增模块时必须同步加到这里。
-@EntityScan(basePackages = {"com.csagent.memory.entity", "com.csagent.auth.entity"})
-@EnableJpaRepositories(basePackages = {"com.csagent.memory.repository", "com.csagent.auth.repository"})
+@EntityScan(basePackages = {"com.csagent.memory.entity", "com.csagent.auth.entity", "com.csagent.rag.entity"})
+@EnableJpaRepositories(basePackages = {"com.csagent.memory.repository", "com.csagent.auth.repository",
+        "com.csagent.rag.repository"})
 public class CsAgentApplication {
 
     public static void main(String[] args) {

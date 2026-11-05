@@ -30,6 +30,15 @@
   --color-sidebar-hover: #334155;
   --color-sidebar-active: #2563eb;
 
+  /*
+    侧边栏内的文字色单独定义，不要复用 --color-text-inverse。
+    原因：深色主题会把 --color-text-inverse 反转成深色（见下方 [data-theme="dark"]），
+    而侧边栏在两种主题下都是深底，反转后就成了深字压深底，直接不可读。
+  */
+  --color-sidebar-text: #ffffff;
+  --color-sidebar-text-secondary: rgba(255, 255, 255, 0.58);
+  --color-sidebar-divider: rgba(255, 255, 255, 0.08);
+
   --color-text: #0f172a;
   --color-text-secondary: #475569;
   --color-text-tertiary: #94a3b8;

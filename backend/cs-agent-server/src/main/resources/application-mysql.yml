@@ -4,8 +4,12 @@ spring:
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:cs_agent}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:}
+    # 默认不用 root：应用只需要 cs_agent 一个库的权限，
+    # 用 root 等于把整个实例（含其他项目的库）交给这个服务
+    username: ${MYSQL_USER:csagent}
+    # 密码来源优先级：环境变量 MYSQL_PASSWORD > application-secret.yml（已被 .gitignore 忽略）
+    # 两级兜底而不是写死，是为了让"本机能跑"和"密码不进版本库"同时成立
+    password: ${MYSQL_PASSWORD:${cs-agent.secrets.mysql-password:}}
   jpa:
     hibernate:
       ddl-auto: update
@@ -13,3 +17,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+
+# 知识库也跟着落库：会话持久化了但文档还在内存的话，重启后机器人「什么都答不出来」，
+# 这种半持久化状态比全内存更难排查
+cs-agent:
+  rag:
+    storage: jdbc

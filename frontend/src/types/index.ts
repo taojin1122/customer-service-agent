@@ -1,5 +1,12 @@
-/** 对话消息角色 */
-export type MessageRole = 'user' | 'assistant' | 'tool' | 'system'
+/**
+ * 对话消息角色。
+ *
+ * `visitor` = 终端访客，`agent` = 人工坐席，`assistant` = 机器人。
+ * 三者分开的原因：转人工后访客看到的"客服"有两个来源，界面上要能区分是机器人答的
+ * 还是人答的（坐席自己也要能判断"这句是不是我已经回过了"）。
+ * `user` 仅用于兼容改造前的历史消息。
+ */
+export type MessageRole = 'visitor' | 'agent' | 'assistant' | 'tool' | 'system' | 'user'
 
 /** 前端展示的聊天消息 */
 export interface ChatMessage {
@@ -20,11 +27,23 @@ export interface AgentTraceItem {
   data: string
 }
 
+/** 会话状态：机器人接待 / 等待人工 / 人工中 / 已结束 */
+export type ConversationStatus = 'bot' | 'waiting' | 'human' | 'closed'
+
+/** 会话来源渠道：内部调试台 / 网页客服窗 */
+export type ConversationChannel = 'internal' | 'web'
+
 /** 会话 */
 export interface Conversation {
   id: string
   title: string
   modelId: string
+  /** 发起方（终端访客）；内部调试台里就是当前账号自己 */
+  visitorId?: string
+  /** 接手的人工坐席，空表示仍由机器人接待 */
+  agentId?: string
+  status?: ConversationStatus
+  channel?: ConversationChannel
   createTime: string
   updateTime: string
 }

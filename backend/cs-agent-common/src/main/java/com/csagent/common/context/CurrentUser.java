@@ -1,5 +1,7 @@
 package com.csagent.common.context;
 
+import com.csagent.common.constant.RoleConstants;
+
 /**
  * 当前请求的身份快照：谁、属于哪个租户、什么角色。
  *
@@ -39,5 +41,23 @@ public record CurrentUser(
      */
     public static CurrentUser platformUser(String userId, String username, String role) {
         return new CurrentUser(null, userId, username, role, true);
+    }
+
+    /**
+     * 是否租户管理员。
+     *
+     * <p>抽成方法而不是各处写 {@code RoleConstants.ADMIN.equals(user.role())}：
+     * "管理员能看本租户全部会话、坐席只能看自己的"这条规则此前在 4 个接口里各写了一遍，
+     * 新增角色（如将来的班长）时必然漏改一处，漏掉的那处就是越权入口（AGENTS.md §2.4）。</p>
+     */
+    public boolean isTenantAdmin() {
+        return RoleConstants.ADMIN.equals(role);
+    }
+
+    /**
+     * 是否匿名访客（用户侧客服窗）。
+     */
+    public boolean isGuest() {
+        return RoleConstants.GUEST.equals(role);
     }
 }

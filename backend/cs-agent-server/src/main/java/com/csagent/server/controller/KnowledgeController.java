@@ -2,6 +2,7 @@ package com.csagent.server.controller;
 
 import com.csagent.common.constant.RoleConstants;
 import com.csagent.common.context.RequireRole;
+import com.csagent.common.context.TenantContext;
 import com.csagent.common.exception.BusinessException;
 import com.csagent.common.result.Result;
 import com.csagent.rag.service.KnowledgeDoc;
@@ -26,6 +27,10 @@ import java.util.List;
  *
  * <p>注意：前端菜单同样对 AGENT 隐藏了知识库入口，但那只是体验层。
  * 真正的边界是这里的注解——隐藏菜单挡不住直接调接口的人。</p>
+ *
+ * <p><b>租户范围一律取自 {@link TenantContext}</b>：四个接口都只作用于当前登录账号所属租户，
+ * 不接受任何租户参数。管理员权限是"本租户的管理员"，不是"所有租户的管理员"，
+ * 这两者在只做 {@code @RequireRole(ADMIN)} 时看起来一样，但少了 tenantId 就是跨租户越权。</p>
  */
 @Slf4j
 @RestController
@@ -45,35 +50,35 @@ public class KnowledgeController {
     @PostMapping("/upload")
     public Result<KnowledgeDoc> upload(@RequestParam("file") MultipartFile file) {
         try {
-            return Result.success(knowledgeService.upload(file));
+            return Result.success(knowledgeService.upload(file, TenantContext.requireTenantId()));
         } catch (IllegalArgumentException e) {
             throw new BusinessException(e.getMessage());
         }
     }
 
     /**
-     * 文档列表
+     * 文档列表（仅本租户）
      */
     @GetMapping("/docs")
     public Result<List<KnowledgeDoc>> list() {
-        return Result.success(knowledgeService.list());
+        return Result.success(knowledgeService.list(TenantContext.requireTenantId()));
     }
 
     /**
-     * 删除文档
+     * 删除文档（仅限本租户的文档）
      */
     @PostMapping("/delete")
     public Result<Void> delete(@RequestParam("docId") String docId) {
-        knowledgeService.delete(docId);
+        knowledgeService.delete(docId, TenantContext.requireTenantId());
         return Result.success();
     }
 
     /**
-     * 检索测试：返回 Top-K 命中知识块
+     * 检索测试：返回本租户 Top-K 命中知识块
      */
     @GetMapping("/search")
     public Result<List<VectorEntry>> search(@RequestParam("query") String query,
                                             @RequestParam(value = "k", defaultValue = "3") int k) {
-        return Result.success(knowledgeService.search(query, k));
+        return Result.success(knowledgeService.search(query, k, TenantContext.requireTenantId()));
     }
 }

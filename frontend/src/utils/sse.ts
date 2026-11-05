@@ -10,17 +10,30 @@
  *    未使用 event: 字段时，若 data 是 {type, data} JSON 信封，自动解包为 (type, data)，
  *    避免把原始 JSON 当作文本展示给用户。
  */
+/**
+ * 可选配置。
+ *
+ * 用对象而不是"第 4 个参数是 signal"：访客入口需要在请求头里带匿名标识，
+ * 而它不需要中断控制器。写成固定位置参数会让调用方传一堆 `undefined` 占位。
+ */
+export interface SseOptions {
+  /** 中断控制器，用于用户主动停止生成 */
+  signal?: AbortSignal
+  /** 额外请求头，如用户侧客服窗的 `X-Visitor-Id` */
+  headers?: Record<string, string>
+}
+
 export async function fetchSSE(
   url: string,
   body: unknown,
   onEvent: (type: string, data: string) => void,
-  signal?: AbortSignal
+  options: SseOptions = {}
 ): Promise<void> {
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...options.headers },
     body: JSON.stringify(body),
-    signal
+    signal: options.signal
   })
 
   if (!response.ok) {

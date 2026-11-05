@@ -45,5 +45,12 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- 测试依赖：会话归属与转人工状态机是"越权 / 抢单"两类线上事故的源头，
+             必须有断言守住（AGENTS.md §8.1⑦ 第 4 条） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

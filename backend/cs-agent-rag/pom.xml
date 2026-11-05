@@ -45,5 +45,18 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- 知识库持久化：文档元数据与向量块需要落库，否则重启后客户上传的资料全部丢失。
+             只在 cs-agent.rag.storage=jdbc 时启用 JPA 实现，默认仍是内存实现（零依赖可跑）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- 测试依赖：知识库租户隔离是数据泄露级红线（AGENTS.md §8.1⑦ 第 4 条），
+             必须有自动化测试证明"B 租户看不到 A 租户的文档"，不能只靠人工点一遍 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

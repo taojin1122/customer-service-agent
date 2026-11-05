@@ -26,3 +26,29 @@ export function isAdmin(role?: string | null): boolean {
 export function isPlatform(role?: string | null): boolean {
   return role === Role.PLATFORM_ADMIN
 }
+
+/**
+ * 角色 → 界面文案。
+ *
+ * 为什么要集中一处：`ADMIN → 管理员` 这类映射一旦在两个组件里各写一份，
+ * 新增角色时必然漏改一处，界面上就会出现"管理员 / ADMIN"混排。
+ * 这是 AGENTS.md §2.4 点名的那类重复。
+ */
+const ROLE_TEXT: Record<string, string> = {
+  [Role.PLATFORM_ADMIN]: '平台运营',
+  [Role.ADMIN]: '管理员',
+  [Role.AGENT]: '坐席'
+}
+
+/**
+ * 取角色的展示文案。
+ *
+ * 未知角色原样返回而不是显示"未知"：能直接看出后端加了新角色、前端还没跟上，
+ * 比界面上出现一堆"未知"更容易定位。
+ */
+export function roleText(role?: string | null): string {
+  if (!role) {
+    return '未登录'
+  }
+  return ROLE_TEXT[role] ?? role
+}

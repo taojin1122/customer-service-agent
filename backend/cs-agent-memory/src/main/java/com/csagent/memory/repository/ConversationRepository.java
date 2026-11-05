@@ -24,9 +24,24 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
     List<ConversationEntity> findByTenantIdAndDeletedFalseOrderByUpdateTimeDesc(String tenantId);
 
     /**
-     * 坐席视角：只看自己的会话。
+     * 访客视角：自己发起的会话。
+     *
+     * <p>内部调试台复用它：那里"访客"就是当前坐席自己。</p>
      */
-    List<ConversationEntity> findByTenantIdAndUserIdAndDeletedFalseOrderByUpdateTimeDesc(String tenantId, String userId);
+    List<ConversationEntity> findByTenantIdAndVisitorIdAndDeletedFalseOrderByUpdateTimeDesc(String tenantId,
+                                                                                         String visitorId);
+
+    /**
+     * 按状态取会话（坐席工作台的"待接入"队列）。
+     */
+    List<ConversationEntity> findByTenantIdAndStatusAndDeletedFalseOrderByUpdateTimeDesc(String tenantId,
+                                                                                       String status);
+
+    /**
+     * 按接手坐席取会话（坐席工作台的"我处理中"）。
+     */
+    List<ConversationEntity> findByTenantIdAndAgentIdAndDeletedFalseOrderByUpdateTimeDesc(String tenantId,
+                                                                                        String agentId);
 
     /**
      * 按 id 取会话，同时限定租户。

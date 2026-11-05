@@ -8,9 +8,11 @@ import com.csagent.agent.model.ChatRequest;
 import com.csagent.agent.observability.AgentMetrics;
 import com.csagent.agent.security.PromptInjectionGuard;
 import com.csagent.common.constant.AgentConstants;
+import com.csagent.common.constant.RoleConstants;
 import com.csagent.common.context.CurrentUser;
 import com.csagent.common.exception.BusinessException;
 import com.csagent.llm.service.ChatService;
+import com.csagent.memory.entity.ConversationEntity;
 import com.csagent.memory.service.MemoryService;
 import com.csagent.prompt.builder.SystemPromptBuilder;
 import com.csagent.rag.service.KnowledgeService;
@@ -217,14 +219,14 @@ public class AgentEngine {
         // 组装消息上下文。messages 就是发给大模型的"完整对话历史"，顺序很重要：系统提示词必须最前。
         // 用滑动窗口而非全量历史：对话越长，token 越贵、模型越容易跑偏，所以记忆层只回放最近若干轮。
         List<Message> messages = new ArrayList<>();
-        String systemPrompt = buildSystemPrompt(request, intent, sink);
+        String systemPrompt = buildSystemPrompt(request, intent, sink, user);
         messages.add(new SystemMessage(systemPrompt));
         messages.addAll(memoryService.buildContextMessages(conversationId));
 
         // 当前这轮的用户消息，加入上下文，同时落库（记忆）供后续轮次回放。
         String userMessage = request.getMessage();
         messages.add(new UserMessage(userMessage));
-        memoryService.appendMessage(conversationId, AgentConstants.ROLE_USER, userMessage, null);
+        memoryService.appendVisitorMessage(conversationId, userMessage);
 
         // ReAct 主循环：每轮"调模型→解析决策→要么调工具要么回答"。
         int iterations = 0;
@@ -365,11 +367,29 @@ public class AgentEngine {
         if (user.tenantId() == null) {
             throw new BusinessException(403, "平台账号不能发起对话");
         }
+        // 渠道由"谁在说话"决定：访客入口进来的是真实对客会话（web），
+        // 内部调试台（坐席自己试 AI）记为 internal，两者统计口径不能混
+        String channel = RoleConstants.GUEST.equals(user.role())
+                ? ConversationEntity.CHANNEL_WEB
+                : ConversationEntity.CHANNEL_INTERNAL;
+
         if (request.getConversationId() == null || request.getConversationId().isBlank()) {
-            return memoryService.createConversation(request.getModelId(), user.tenantId(), user.userId()).getId();
+            return memoryService.createConversation(request.getModelId(), user.tenantId(),
+                    user.userId(), channel).getId();
         }
-        if (memoryService.getConversation(request.getConversationId(), user.tenantId()).isEmpty()) {
-            throw new BusinessException("会话不存在：" + request.getConversationId());
+
+        ConversationEntity conv = memoryService.getConversation(request.getConversationId(), user.tenantId())
+                .orElseThrow(() -> new BusinessException("会话不存在：" + request.getConversationId()));
+
+        // 只校验租户是不够的：同租户内访客 A 拿到访客 B 的会话 id 就能读别人的对话。
+        // 归属同时认发起方与接手坐席——后者用于坐席在工作台里接手后继续对话。
+        boolean owned = user.userId().equals(conv.getVisitorId())
+                || user.userId().equals(conv.getAgentId());
+        if (!owned) {
+            throw new BusinessException(403, "无权访问该会话");
+        }
+        if (ConversationEntity.STATUS_CLOSED.equals(conv.getStatus())) {
+            throw new BusinessException(409, "会话已结束，请重新发起会话");
         }
         return request.getConversationId();
     }
@@ -381,7 +401,8 @@ public class AgentEngine {
      *
      * @param intent 已识别的用户意图，写入提示词让模型回答更有针对性；同时用于"纯问候不下挂工具/知识"的轻量分流。
      */
-    private String buildSystemPrompt(ChatRequest request, IntentResult intent, FluxSink<AgentEvent> sink) {
+    private String buildSystemPrompt(ChatRequest request, IntentResult intent, FluxSink<AgentEvent> sink,
+                                     CurrentUser user) {
         StringBuilder prompt = new StringBuilder();
         // 人设来自配置（cs-agent.persona.*）：项目是通用客服框架，换行业只改配置，不动代码。
         // TODO 多租户：生产应改为按租户从 tenant-service 动态下发，而非全局共享一份人设。
@@ -410,10 +431,11 @@ public class AgentEngine {
         }
 
         // RAG 知识库上下文：把"和用户问题最相关的知识片段"塞进提示词，让模型基于真实资料回答，减少胡说（幻觉）。
-        // knowledgeService.list() 为空说明该租户还没建知识库，直接跳过。
-        if (enableRag && !knowledgeService.list().isEmpty()) {
+        // docCount 为 0 说明该租户还没建知识库，直接跳过——省一次 Embedding 调用（那是要花钱的）。
+        // 这里必须带 user.tenantId()：不带就用全库检索，客户 A 的文档会被客户 B 的机器人引用。
+        if (enableRag && user.tenantId() != null && knowledgeService.docCount(user.tenantId()) > 0) {
             // 取 top-3 最相关片段：太多会撑爆上下文、稀释重点；太少可能漏掉答案。3 是客服场景的经验值。
-            String knowledgeContext = knowledgeService.buildKnowledgeContext(request.getMessage(), 3);
+            String knowledgeContext = knowledgeService.buildKnowledgeContext(request.getMessage(), 3, user.tenantId());
             if (!knowledgeContext.isBlank()) {
                 prompt.append("\n\n[知识库资料]\n").append(knowledgeContext);
                 // 推一个 rag 事件给前端，展示"机器人参考了哪些资料"（可溯源，也是 M1 验收点之一）。

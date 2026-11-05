@@ -24,6 +24,16 @@ public final class RoleConstants {
     /** 坐席：客户公司的一线客服，只能接待与查看自己的会话 */
     public static final String AGENT = "AGENT";
 
+    /**
+     * 终端访客：嵌入客户网站里的客服窗用户，<b>没有账号、不经过 JWT</b>。
+     *
+     * <p>它不是一个真实角色，只用于在引擎内部区分"这句话是谁说的"：
+     * 访客身份由用户侧入口根据匿名标识构造，用于决定会话渠道（web）与消息角色（visitor）。
+     * 不要把它加入 {@link com.csagent.common.context.RequireRole} 的白名单——
+     * 访客永远不该访问租户后台接口。</p>
+     */
+    public static final String GUEST = "GUEST";
+
     private RoleConstants() {
     }
 }
